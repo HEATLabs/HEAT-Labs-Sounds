@@ -157,57 +157,17 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
             # Create new filename
             new_filename = f"{i}{ext}"
 
-            # Full paths for renaming
-            old_file_path = os.path.join(root, filename)
-            new_file_path = os.path.join(root, new_filename)
-
             # Create sound ID
             sound_id = f"{folder_name}-{i}"
 
-            # Check if file is already numbered correctly
-            if filename == new_filename:
-                print(
-                    f"File {filename} in {folder_name}/ is already correctly numbered"
-                )
-
-                # Check if this sound is already in JSON
-                if not is_sound_in_json(data, sound_id):
-                    # File is numbered but not in JSON, add it
-                    github_path = f"{rel_path.replace(os.path.sep, '/')}/{new_filename}"
-
-                    # Find or create the category
-                    category = None
-                    for cat in data["categories"]:
-                        if cat["categoryName"] == category_name:
-                            category = cat
-                            break
-
-                    # If category doesn't exist, create it
-                    if category is None:
-                        category = {
-                            "categoryName": category_name,
-                            "categoryDescription": f"Sound files from {folder_name} directory",
-                            "categoryItems": []
-                        }
-                        data["categories"].append(category)
-                        print(f"Created new category: {category_name}")
-
-                    new_entry = {
-                        "soundID": sound_id,
-                        "soundType": folder_name,
-                        "soundSource": sound_source,
-                        "soundFile": f"https://cdn.jsdelivr.net/gh/HEATLabs/Sound-Bank@main/sounds/{github_path}",
-                        "soundName": f"{folder_name} - Sound {i}",
-                        "soundDescription": f"Sound file from {folder_name} directory",
-                    }
-
-                    category["categoryItems"].append(new_entry)
-                    print(f"Added missing entry to JSON: {sound_id}")
-                else:
-                    print(f"Entry {sound_id} already exists in JSON - skipping")
-
-                # Skip renaming and metadata clearing for already correctly numbered files
+            # Check if file is already numbered correctly AND exists in JSON
+            if is_file_already_numbered(filename) and is_sound_in_json(data, sound_id):
+                print(f"File {filename} in {folder_name}/ is already correctly numbered and in JSON - skipping")
                 continue
+
+            # Full paths for renaming
+            old_file_path = os.path.join(root, filename)
+            new_file_path = os.path.join(root, new_filename)
 
             # Step 1: Clear metadata from the original file
             print(f"Clearing metadata from {filename}...")
@@ -228,10 +188,13 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
                 while True:
                     temp_new_filename = f"{j}{ext}"
                     temp_new_file_path = os.path.join(root, temp_new_filename)
-                    if not os.path.exists(temp_new_file_path):
+                    temp_sound_id = f"{folder_name}-{j}"
+
+                    # Check if this alternative number is also available
+                    if not os.path.exists(temp_new_file_path) and not is_sound_in_json(data, temp_sound_id):
                         new_filename = temp_new_filename
                         new_file_path = temp_new_file_path
-                        sound_id = f"{folder_name}-{j}"
+                        sound_id = temp_sound_id
                         print(f"  Using alternative number: {new_filename}")
                         break
                     j += 1
@@ -305,15 +268,15 @@ def rename_files_in_current_directory():
 
     # Rename files starting from 1, but check for conflicts
     for i, filename in enumerate(files, start=1):
+        # Skip if file is already numbered
+        if is_file_already_numbered(filename):
+            print(f"File {filename} is already correctly numbered - skipping")
+            continue
+
         # Get the file extension
         ext = os.path.splitext(filename)[1]
         # Create new filename
         new_name = f"{i}{ext}"
-
-        # Skip if file is already correctly named
-        if filename == new_name:
-            print(f"File {filename} is already correctly numbered - skipping")
-            continue
 
         # Check if target file already exists
         if os.path.exists(new_name):
