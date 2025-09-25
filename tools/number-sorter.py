@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from mutagen import File
 from mutagen.id3 import (
     ID3,
@@ -78,6 +79,30 @@ def clear_audio_metadata(file_path):
             f"  Warning: Could not clear metadata for {os.path.basename(file_path)}: {str(e)}"
         )
         return False
+
+
+def safe_rename(old_path, new_path, max_retries=5, retry_delay=0.1):
+    for attempt in range(max_retries):
+        try:
+            if old_path != new_path:
+                os.rename(old_path, new_path)
+            return True
+        except PermissionError as e:
+            if attempt < max_retries - 1:
+                print(
+                    f"  Permission error (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s..."
+                )
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print(
+                    f"  Error: Failed to rename after {max_retries} attempts: {str(e)}"
+                )
+                return False
+        except Exception as e:
+            print(f"  Error renaming file: {str(e)}")
+            return False
+    return False
 
 
 def is_file_already_numbered(filename):
@@ -162,12 +187,22 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
 
             # Check if file is already numbered correctly AND exists in JSON
             if is_file_already_numbered(filename) and is_sound_in_json(data, sound_id):
-                print(f"File {filename} in {folder_name}/ is already correctly numbered and in JSON - skipping")
+                print(
+                    f"File {filename} in {folder_name}/ is already correctly numbered and in JSON - skipping completely"
+                )
                 continue
 
             # Full paths for renaming
             old_file_path = os.path.join(root, filename)
             new_file_path = os.path.join(root, new_filename)
+
+            # Check if target file already exists
+            if os.path.exists(new_file_path) and old_file_path != new_file_path:
+                print(
+                    f"  Error: Target file {new_filename} already exists in {folder_name}/"
+                )
+                print(f"  Cannot rename {filename} - skipping this file")
+                continue
 
             # Step 1: Clear metadata from the original file
             print(f"Clearing metadata from {filename}...")
@@ -177,32 +212,13 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
                 print(f"  Metadata cleared from {filename}")
 
             # Step 2: Rename the file
-            if os.path.exists(new_file_path) and old_file_path != new_file_path:
-                # If target file already exists, we need to handle this carefully
-                print(
-                    f"  Warning: Target file {new_filename} already exists in {folder_name}/"
-                )
-
-                # Find an available number
-                j = i + 1
-                while True:
-                    temp_new_filename = f"{j}{ext}"
-                    temp_new_file_path = os.path.join(root, temp_new_filename)
-                    temp_sound_id = f"{folder_name}-{j}"
-
-                    # Check if this alternative number is also available
-                    if not os.path.exists(temp_new_file_path) and not is_sound_in_json(data, temp_sound_id):
-                        new_filename = temp_new_filename
-                        new_file_path = temp_new_file_path
-                        sound_id = temp_sound_id
-                        print(f"  Using alternative number: {new_filename}")
-                        break
-                    j += 1
-
-            # Only rename if the source and target are different
             if old_file_path != new_file_path:
-                os.rename(old_file_path, new_file_path)
-                print(f"Renamed {filename} to {new_filename} in {folder_name}/")
+                success = safe_rename(old_file_path, new_file_path)
+                if success:
+                    print(f"Renamed {filename} to {new_filename} in {folder_name}/")
+                else:
+                    print(f"  Failed to rename {filename} - skipping this file")
+                    continue
             else:
                 print(f"File {filename} is already correctly named")
 
@@ -223,7 +239,7 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
                     category = {
                         "categoryName": category_name,
                         "categoryDescription": f"Sound files from {folder_name} directory",
-                        "categoryItems": []
+                        "categoryItems": [],
                     }
                     data["categories"].append(category)
                     print(f"Created new category: {category_name}")
@@ -256,6 +272,29 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
     print(f"Updated {sounds_json_path} with new sound entries!")
 
 
+def safe_rename_current_dir(old_name, new_name, max_retries=5, retry_delay=0.1):
+    for attempt in range(max_retries):
+        try:
+            os.rename(old_name, new_name)
+            return True
+        except PermissionError as e:
+            if attempt < max_retries - 1:
+                print(
+                    f"  Permission error (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s..."
+                )
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print(
+                    f"  Error: Failed to rename after {max_retries} attempts: {str(e)}"
+                )
+                return False
+        except Exception as e:
+            print(f"  Error renaming file: {str(e)}")
+            return False
+    return False
+
+
 def rename_files_in_current_directory():
     # Get the current script's filename
     script_name = os.path.basename(__file__)
@@ -280,20 +319,17 @@ def rename_files_in_current_directory():
 
         # Check if target file already exists
         if os.path.exists(new_name):
-            print(f"Warning: Target file {new_name} already exists!")
-            # Find an available number
-            j = i + 1
-            while True:
-                temp_new_name = f"{j}{ext}"
-                if not os.path.exists(temp_new_name):
-                    new_name = temp_new_name
-                    print(f"Using alternative number: {new_name}")
-                    break
-                j += 1
+            print(
+                f"Error: Target file {new_name} already exists! - skipping {filename}"
+            )
+            continue
 
-        # Rename the file
-        os.rename(filename, new_name)
-        print(f"Renamed {filename} to {new_name}")
+        # Rename the file with safe rename
+        success = safe_rename_current_dir(filename, new_name)
+        if success:
+            print(f"Renamed {filename} to {new_name}")
+        else:
+            print(f"Failed to rename {filename} - skipping")
 
 
 def main():
