@@ -90,9 +90,10 @@ def get_sound_id(folder_name, file_number):
 
 
 def is_sound_in_json(data, sound_id):
-    for item in data["soundsCategories"][0]["categoryItems"]:
-        if item["soundID"] == sound_id:
-            return True
+    for category in data["categories"]:
+        for item in category["categoryItems"]:
+            if item["soundID"] == sound_id:
+                return True
     return False
 
 
@@ -122,6 +123,9 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
 
         # Extract folder name for sound ID
         folder_name = os.path.basename(root)
+
+        # Create category name from folder name
+        category_name = folder_name.replace("-", " ").title()
 
         # Determine sound source based on folder name
         if folder_name.lower().startswith("oat1"):
@@ -158,7 +162,7 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
             new_file_path = os.path.join(root, new_filename)
 
             # Create sound ID
-            sound_id = get_sound_id(folder_name, i)
+            sound_id = f"{folder_name}-{i}"
 
             # Check if file is already numbered correctly
             if filename == new_filename:
@@ -171,6 +175,23 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
                     # File is numbered but not in JSON, add it
                     github_path = f"{rel_path.replace(os.path.sep, '/')}/{new_filename}"
 
+                    # Find or create the category
+                    category = None
+                    for cat in data["categories"]:
+                        if cat["categoryName"] == category_name:
+                            category = cat
+                            break
+
+                    # If category doesn't exist, create it
+                    if category is None:
+                        category = {
+                            "categoryName": category_name,
+                            "categoryDescription": f"Sound files from {folder_name} directory",
+                            "categoryItems": []
+                        }
+                        data["categories"].append(category)
+                        print(f"Created new category: {category_name}")
+
                     new_entry = {
                         "soundID": sound_id,
                         "soundType": folder_name,
@@ -180,7 +201,7 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
                         "soundDescription": f"Sound file from {folder_name} directory",
                     }
 
-                    data["soundsCategories"][0]["categoryItems"].append(new_entry)
+                    category["categoryItems"].append(new_entry)
                     print(f"Added missing entry to JSON: {sound_id}")
                 else:
                     print(f"Entry {sound_id} already exists in JSON - skipping")
@@ -210,7 +231,7 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
                     if not os.path.exists(temp_new_file_path):
                         new_filename = temp_new_filename
                         new_file_path = temp_new_file_path
-                        sound_id = get_sound_id(folder_name, j)
+                        sound_id = f"{folder_name}-{j}"
                         print(f"  Using alternative number: {new_filename}")
                         break
                     j += 1
@@ -227,6 +248,23 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
 
             # Check if this sound is already in JSON
             if not is_sound_in_json(data, sound_id):
+                # Find or create the category
+                category = None
+                for cat in data["categories"]:
+                    if cat["categoryName"] == category_name:
+                        category = cat
+                        break
+
+                # If category doesn't exist, create it
+                if category is None:
+                    category = {
+                        "categoryName": category_name,
+                        "categoryDescription": f"Sound files from {folder_name} directory",
+                        "categoryItems": []
+                    }
+                    data["categories"].append(category)
+                    print(f"Created new category: {category_name}")
+
                 # Create new entry
                 new_entry = {
                     "soundID": sound_id,
@@ -238,13 +276,15 @@ def rename_and_update_sounds(sounds_json_path, sounds_folder_path):
                 }
 
                 # Add to JSON data
-                data["soundsCategories"][0]["categoryItems"].append(new_entry)
+                category["categoryItems"].append(new_entry)
                 print(f"Added to JSON: {new_entry['soundID']}")
             else:
                 print(f"Entry {sound_id} already exists in JSON - skipping")
 
     # Sort the JSON entries by soundID for consistency
-    data["soundsCategories"][0]["categoryItems"].sort(key=lambda x: x["soundID"])
+    data["categories"].sort(key=lambda x: x["categoryName"])
+    for category in data["categories"]:
+        category["categoryItems"].sort(key=lambda x: x["soundID"])
 
     # Save updated JSON
     with open(sounds_json_path, "w", encoding="utf-8") as f:
