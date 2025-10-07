@@ -1,6 +1,6 @@
 <div align="center">
 
-# HEAT Labs - Sound Bank
+# HEAT Labs - Sounds
 
 <img src="https://raw.githubusercontent.com/HEATLabs/Website-Images/refs/heads/main/social-share/HEATLabs.png" alt="HEAT Labs Banner"/>
 
