@@ -336,8 +336,8 @@ def main():
     print("Starting file processing...")
 
     # Configuration
-    SOUNDS_JSON_PATH = "../../Website-Configs/sounds.json"
-    SOUNDS_FOLDER_PATH = "../sounds"
+    SOUNDS_JSON_PATH = "../../HEAT-Labs-Configs/sounds.json"
+    SOUNDS_FOLDER_PATH = "../../HEAT-Labs-Sounds/sounds"
 
     # Step 1: Rename files in current directory
     print("\n=== Step 1: Renaming files in current directory ===")
