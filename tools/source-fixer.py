@@ -21,4 +21,4 @@ def update_sound_source(file_path):
 
 
 if __name__ == "__main__":
-    update_sound_source('sounds.json')
+    update_sound_source('../../HEAT-Labs-Configs/sounds.json')
